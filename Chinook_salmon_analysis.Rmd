@@ -1,0 +1,169 @@
+---
+title: "Chinook_salmon_analysis"
+author: "Charles Hendrickson"
+date: "11/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load all the packages needed here
+library(tidyverse)
+library(readr)
+library(gt)
+library(tufte)
+library(feasts)
+library(tsibble)
+```
+
+
+# I am interested in answering the following question, "Is the mean fork length (length of fish) of Chinook salmon different in sites with colder water temperatures than sites with warmer water temperatures?" There are 61 different sampling sites where the fork length and water temperature was taken from 1976-2021. My plan is to take the mean water temp across all sites and then compare the mean water temp of each individual site to this overall mean water temp, with sites being over this value having 'warmer than average water temps' and vice versa. I will conduct a hypothesis test, where the null is that there is no difference in fork length in warmer vs. colder water temps. I will complete a similar analysis to lab 7 from class. With regards to some of my 61 samples being warmer and colder, how should I approach comparing the two because we only worked with two different samples in class whereas I am working with 61. Let me know what you think! I am excited to see if this works out
+
+
+- Load Data 
+```{r}
+# URL of data set: https://portal.edirepository.org/nis/metadataviewer?packageid=edi.244.8
+
+# Import data and convert it to a data frame
+DJFMP_df <- as.data.frame(
+  read.csv(file = "data/1976-2021_DJFMP_beach_seine_fish_and_water_quality_data.csv"))
+
+```
+
+-Filter Data
+```{r}
+# Filter data set for just Chinook salmon (CHN) observations 
+DJFMP_CHN_df <- DJFMP_df %>% 
+  filter(OrganismCode == 'CHN') %>% 
+  select(Location, SampleDate, ForkLength, WaterTemp) %>% 
+  mutate(SampleDate = as.Date(SampleDate))
+
+```
+
+- Plot Data
+```{r}
+# Plot the Chinook salmon count over time
+ggplot(data = DJFMP_CHN_df, aes(x = SampleDate, y = ForkLength)) +
+  geom_line() +
+  labs(title = "Fork Length of Chinook Salmon (1976-2021)",
+       x = "Date",
+       y = "Fork Length (mm)")
+```
+- Check for outliers 
+```{r}
+# Check for outliers
+outliers <- DJFMP_CHN_df %>% 
+  filter(ForkLength > 400)
+
+# I might want to remove these because most of the data is on out-migrating juvenile fish. 
+```
+**All the Chinook salmon larger than 400mm are classified as `adults`.**
+
+- Project Question: "Is the mean fork length of Chinook salmon different in colder water temperatures than in warmer water temperatures?"
+
+I will consider differences in the mean Chinook salmon fork length (mm) across sites with different mean water temperatures in the San Francisco Estuary (1976-2021), and conduct a simple hypothesis test. 
+Compute the mean and standard deviation of the fork length of Chinook salmon across the seine locations in the San Francisco Estuary. Report these summary statistics in a table. 
+```{r}
+# Drop NA's from WaterTemp column
+DJFMP_CHN_df <- DJFMP_CHN_df[!is.na(DJFMP_CHN_df$WaterTemp),]
+
+# Mean and SD of Chinook salmon length and water temp
+summary_stats <- DJFMP_CHN_df %>%
+  group_by(Location) %>% 
+  summarise(sd_length = sd(ForkLength), mean_length = mean(ForkLength), 
+            sd_temp = sd(WaterTemp),  mean_temp = mean(WaterTemp))
+
+```
+
+a. State your null and alternative hypotheses 
+**Null Hypothesis**
+$$H_{0}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} = 0$$
+**Alternative hypothesis**
+$$H_{A}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} \neq 0$$
+b. Compute a point estimate of your parameter of interest
+**point estimate**
+```{r}
+# First check which site has the max water temp and which has the min water temp. 
+NorthCentral_mean <- summary_stats_frost %>%
+  filter(region == "North Central") %>%
+  summarise(mean)
+  
+South_mean <- summary_stats_frost %>% 
+  filter(region == "South") %>% 
+  summarise(mean)
+
+point_estimate <- as.numeric(NorthCentral_mean - South_mean)
+print(point_estimate)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+- Scatterplot showing changes in Chinook salmon fork length ($y$-axis) as it relates to water temperature ($x$-axis). 
+```{r}
+ggplot(data=DJFMP_CHN_df, aes(x=WaterTemp, y = ForkLength)) + 
+  geom_point(size=3) + theme_bw() + geom_hline(yintercept=0, color="red")
+```
+
+```{r}
+# Determine where data density is relatively high versus low
+ggplot(data=DJFMP_CHN_df, aes(x=WaterTemp, y = ForkLength)) + 
+  geom_point(alpha=0.1, size=3) + theme_bw() + geom_hline(yintercept=0, color="red")
+
+```
+
+- Use the `lm()` command to estimate the following simple linear regression:
+$$ \text{fork length}_i = \beta_0 + \beta_1 \text{water temperature}_i + \varepsilon_i $$
+```{r}
+summary(lm(ForkLength ~ WaterTemp, data = DJFMP_CHN_df))
+```
+**Our regression results imply that we predict a loss of 0.0036 cm of equivalent water height per month in grid cells with zero irrigation. We also estimate that a one percentage point increase in a grid cell's irrigated area (e.g., from 43% irrigated to 44% irrigated, or from 86% irrigated to 87% irrigated) will lead to an increase in water loss of 0.0018 cm of equivalent water height per month. For example, consider a grid cell with 50% irrigated area and an existing downward trend in water storage of -0.001 cm of equivalent water height per month. If we increase irrigated area to 51%, we estimate the trend in water storage will change to: $-0.001 + -0.0018 = -0.0028$ cm e.w.h. per month.**
+
+
+
+
+
+
+```{r}
+# Find the mean of each month per site and then get the time series of that data frame. 
+
+DJFMP_CHN_ts <- ts(DJFMP_CHN_df$ForkLength, start = c(1976, 05), frequency = 12)
+
+# Load DJFMP_df data set 
+DJFMP_tsbl <- tbl_df(DJFMP_df)
+
+DJFMP_tsbl <- as.Date(DJFMP_tsbl$SampleDate)
+
+mdeaths_tsbl <- as_tsibble(mdeaths)
+
+# Create 
+DJFMP_tsbl <- DJFMP_tsbl %>%
+  as_tsibble(
+    key = c(), 
+    index = SampleDate, 
+    regular = FALSE
+  )
+
+as.Date(DJFMP_tsbl$SampleDate)
+
+
+
+decomp <- mdeaths_tsbl %>% 
+  model(
+    classical_decomposition(deaths, type = "additive")) %>%
+  components() %>% 
+  autoplot() +
+  labs(title = "Classical additive decomposition of male deaths from lung disease (1974 - 1979)")
+
+plot(decomp)
+```
+
+
