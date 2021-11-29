@@ -95,9 +95,8 @@ forklength_vs_watertemp_alpha <- ggplot(data = DJFMP_CHN_df,
 
 forklength_vs_watertemp_alpha
 ```
-
+- Make a density plot with `geom_bin2d()` of Chinook salmon fork length ($y$-axis) as it relates to water temperature ($x$-axis). 
 ```{r}
-# Make a density plot with `geom_bin2d()
 forklength_vs_watertemp_density <- ggplot(data = DJFMP_CHN_df, 
                                   aes(x = WaterTemp, 
                                       y = ForkLength)) +
@@ -113,15 +112,16 @@ forklength_vs_watertemp_density
 - Use the `lm()` command to estimate the following simple linear regression:
 $$ \text{fork length}_i = \beta_0 + \beta_1 \text{water temperature}_i + \varepsilon_i $$
 ```{r}
-# We can use lm(y~x, my_data) in R to run a linear regression of y on x, including a constant term.
-summary(lm(ForkLength ~ WaterTemp, data = DJFMP_CHN_df))
+# Run a linear regression of y on x, including a constant term.
+model <- summary(lm(ForkLength ~ WaterTemp, data = DJFMP_CHN_df))
+model
 ```
 
 **Intercept:** On average, the predicted fork length of a Chinook salmon for a zero degree Celsius change in water temperature is 30.3742 (mm).  
 
-- **Coefficient on water temperature (WaterTemp):** On average, the predicted fork length of a Chinook salmon increases by 1.6276 (mm) for every one degree Celsius increase in water temperature. 
+**Coefficient on water temperature (WaterTemp):** On average, the predicted fork length of a Chinook salmon increases by 1.6276 (mm) for every one degree Celsius increase in water temperature. 
 
-
+**Multiple R-squared:** Our coefficient of determination ($R^2$) tells us that 7.75% of the variation in Chinook salmon fork length is explained by water temperature at the site. 
 ```{r}
 forklength_vs_watertemp <- ggplot(data = DJFMP_CHN_df, 
                                   aes(x = WaterTemp, 
@@ -151,19 +151,19 @@ ggplot(data = predictions) + geom_histogram(aes(residuals), bins=25) +
   labs(title = "Residual Distribution") +
   theme_classic()
 ```
+**The residuals appear to be mean zero based on the histogram above, but there is a left tail in the residuals distribution, so it is definitely not perfectly normal distribution.**
 
 ```{r}
 # mean
 mean(predictions$residuals)
 
 # variance in residuals against fork length
-ggplot(predictions) + geom_point(aes(x = ForkLength, y = residuals))
+ggplot(predictions) + geom_point(aes(x = ForkLength, y = residuals), alpha=.1, size=2)
 ```
-
+**Overall, the variance remains relatively constant across most levels of $x$, which agrees with the constant $\sigma^2$ assumption of OLS. However, the variance appears to increase when $x$ reaches values greater than 100 mm as the data become very sparse and tend to be relatively far from the 0 line. Therefore, it is likely that OLS assumption 4 is violated.**
 
 # -----------------------------------------------------------------------------
 - Second analysis 
-
 
 - Compute the mean and standard deviation of the fork length of Chinook salmon across the seine locations in the San Francisco Estuary.  
 ```{r}
@@ -189,50 +189,26 @@ $$H_{A}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} \neq 0$$
 b. Compute a point estimate of your parameter of interest
 **point estimate**
 ```{r}
-# First check which site has the max water temp and which has the min water temp. 
-warm_temp_mean <- summary_stats %>%
-  filter(mean_water_temp > mean_water_temp_overall) %>%
-  summarise(warm_water_mean = mean(mean_water_temp))
+# The difference in the mean fork lengths for warm water sites vs. cold water sites. 
+warm_sites <- DJFMP_CHN_df %>%
+  filter(WaterTemp > mean_water_temp_overall) %>%
+  summarise(ForkLength, WaterTemp)
   
-cold_temp_mean <- summary_stats %>% 
-  filter(mean_water_temp < mean_water_temp_overall) %>% 
-  summarise(old_temp_mean = mean(mean_water_temp))
+cold_sites <- DJFMP_CHN_df %>% 
+  filter(WaterTemp < mean_water_temp_overall) %>%
+  summarise(ForkLength, WaterTemp)
 
-point_estimate <- as.numeric(warm_temp_mean - cold_temp_mean)
-print(point_estimate)
 ```
-
-
-
-
-
-
 
 ```{r}
-zero <- DJFMP_CHN_df %>% 
-  filter(ForkLength = 0) %>% 
-  summarise(ForkLength)
+t.test(warm_sites$ForkLength[warm_sites$WaterTemp], 
+       cold_sites$ForkLength[cold_sites$WaterTemp])
 ```
+**The test statistic (z-score) tells us that the observed difference in fork length is 413.67 standard deviations above the Null hypothesis of zero difference.**
 
+**Since $p-value = 2.2e-16 < 0.05$ we reject the null that there is no difference in Chinook salmon fork length in sites with colder mean water temperatures versus sites with warmer mean water temperatures. We can say there is a statistically significant difference (at the 5% significance level) in the Chinook salmon fork length across sites with colder mean water temperatures versus sites with warmer mean water temperatures.**
 
-
-
-
-
-
-
-- Use the `lm()` command to estimate the following simple linear regression:
-$$ \text{fork length}_i = \beta_0 + \beta_1 \text{water temperature}_i + \varepsilon_i $$
-```{r}
-# We can use lm(y~x, my_data) in R to run a linear regression of y on x, including a constant term.
-summary(lm(ForkLength ~ WaterTemp, data = DJFMP_CHN_df))
-```
-**My regression results imply that we predict a gain of 0.0036 cm of equivalent water height per month in grid cells with zero irrigation. We also estimate that a one percentage point increase in a grid cell's irrigated area (e.g., from 43% irrigated to 44% irrigated, or from 86% irrigated to 87% irrigated) will lead to an increase in water loss of 0.0018 cm of equivalent water height per month. For example, consider a grid cell with 50% irrigated area and an existing downward trend in water storage of -0.001 cm of equivalent water height per month. If we increase irrigated area to 51%, we estimate the trend in water storage will change to: $-0.001 + -0.0018 = -0.0028$ cm e.w.h. per month.**
-
-
-
-
-
+**There is a 95% probability that the range [30.12407, 30.41090] is likely to contain the true population parameter, which is the Chinook salmon fork length across sites with colder mean water temperatures versus sites with warmer mean water temperatures.**
 
 ```{r}
 # Find the mean of each month per site and then get the time series of that data frame. 
