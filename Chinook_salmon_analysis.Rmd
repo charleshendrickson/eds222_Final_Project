@@ -189,7 +189,7 @@ $$H_{A}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} \neq 0$$
 b. Compute a point estimate of your parameter of interest
 **point estimate**
 ```{r}
-# The difference in the mean fork lengths for warm water sites vs. cold water sites. 
+# The fork lengths for warm water sites vs. cold water sites
 warm_sites <- DJFMP_CHN_df %>%
   filter(WaterTemp > mean_water_temp_overall) %>%
   summarise(ForkLength, WaterTemp)
