@@ -14,14 +14,24 @@ library(gt)
 library(tufte)
 library(feasts)
 library(tsibble)
+library(xtable)
+library(knitr)
 ```
-
 
 # I am interested in answering the following question, "Is the mean fork length (length of fish) of Chinook salmon different in sites with colder water temperatures than sites with warmer water temperatures?" There are 61 different sampling sites where the fork length and water temperature was taken from 1976-2021. My plan is to take the mean water temp across all sites and then compare the mean water temp of each individual site to this overall mean water temp, with sites being over this value having 'warmer than average water temps' and vice versa. I will conduct a hypothesis test, where the null is that there is no difference in fork length in warmer vs. colder water temps. I will complete a similar analysis to lab 7 from class. With regards to some of my 61 samples being warmer and colder, how should I approach comparing the two because we only worked with two different samples in class whereas I am working with 61. Let me know what you think! I am excited to see if this works out
 
 - Project Question: "Is the mean fork length of Chinook salmon different at sites with colder water temperatures than in warmer water temperatures on average?"
 
 - I will consider differences in the mean Chinook salmon fork length (mm) across sites with different mean water temperatures in the San Francisco Estuary (1976-2021), and conduct a simple hypothesis test.
+
+## Step 1: Define the **null** and **alternative** hypotheses: 
+
+**Null Hypothesis**
+$$H_{0}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} = 0$$
+**Alternative hypothesis**
+$$H_{A}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} \neq 0$$
+## Step 2: Collect data and compute the point estimate.
+
 
 - Load Data 
 ```{r}
@@ -33,6 +43,7 @@ DJFMP_df <- as.data.frame(
 
 ```
 
+
 -Filter Data
 ```{r}
 # Filter data set for just Chinook salmon (CHN) observations 
@@ -41,7 +52,13 @@ DJFMP_CHN_df <- DJFMP_df %>%
   select(Location, SampleDate, ForkLength, WaterTemp) %>% 
   mutate(SampleDate = as.Date(SampleDate))
 
+# Drop NA's from WaterTemp column
+DJFMP_CHN_df <- DJFMP_CHN_df[!is.na(DJFMP_CHN_df$WaterTemp),]
+
+# Drop NA's from ForkLength column
+DJFMP_CHN_df <- DJFMP_CHN_df[!is.na(DJFMP_CHN_df$ForkLength),]
 ```
+
 
 - Remove Outliers 
 ```{r}
@@ -52,18 +69,18 @@ large_outliers <- DJFMP_CHN_df %>%
 small_outliers <- DJFMP_CHN_df %>% 
   filter(ForkLength <= 0)
 
-# Remove these because fish cannot cannot have a fork length of zero mm and we only want juvenile Chinook salmon that are below 250 mm in length, not adults.
+# Remove these data points because Chinook salmon cannot have a fork length of zero mm and we only want data on juvenile Chinook salmon that are below 250 mm in length, not adults. 
 DJFMP_CHN_df <- DJFMP_CHN_df %>% 
   filter(ForkLength != 0 & ForkLength < 250)
 ```
-**All the Chinook salmon larger than 250mm are classified as `adults`. All Chinook salmon that are 0mm are Null**
+
 
 - Plot Data
 ```{r}
 # Plot Chinook salmon fork length over time
 ggplot(data = DJFMP_CHN_df, aes(x = SampleDate, y = ForkLength)) +
   geom_line() +
-  labs(title = "Fork Length of Chinook Salmon (1976-2021)",
+  labs(title = "Fork Length of Chinook Salmon in San Francisco Bay Estuary (1976-2021)",
        x = "Date",
        y = "Fork Length (mm)")
 ```
@@ -81,6 +98,7 @@ forklength_vs_watertemp <- ggplot(data = DJFMP_CHN_df,
 
 forklength_vs_watertemp
 ```
+
 - Make a density plot of Chinook salmon fork length ($y$-axis) as it relates to water temperature ($x$-axis). 
 ```{r}
 # Determine where data density is relatively high versus low
@@ -95,6 +113,7 @@ forklength_vs_watertemp_alpha <- ggplot(data = DJFMP_CHN_df,
 
 forklength_vs_watertemp_alpha
 ```
+
 - Make a density plot with `geom_bin2d()` of Chinook salmon fork length ($y$-axis) as it relates to water temperature ($x$-axis). 
 ```{r}
 forklength_vs_watertemp_density <- ggplot(data = DJFMP_CHN_df, 
@@ -109,12 +128,47 @@ forklength_vs_watertemp_density <- ggplot(data = DJFMP_CHN_df,
 forklength_vs_watertemp_density
 ```
 
+- Compute Point Estimate of Fork Length 
+```{r}
+# Mean water temp of all sites 
+mean_water_temp_overall <- mean(DJFMP_CHN_df$WaterTemp)
+
+# Mean fork length of warm water sites and cold water sites
+warm_sites <- DJFMP_CHN_df %>%
+  filter(WaterTemp > mean_water_temp_overall) %>%
+  summarise(mean = mean(ForkLength))
+  
+cold_sites <- DJFMP_CHN_df %>% 
+  filter(WaterTemp < mean_water_temp_overall) %>%
+  summarise(mean = mean(ForkLength))
+
+# Difference in mean fork lengths 
+point_est = as.numeric(warm_sites - cold_sites)
+print(point_est)
+
+```
+**7.342742 could just be a difference in the samples due to random variability. Thus, we must calculate a measure of variability, not just a measure of the the difference in means.**
+
+
+## Step 3:  Model the variability of the statistic
+
+- Conduct t-test
+```{r}
+t.test(DJFMP_CHN_df$ForkLength[DJFMP_CHN_df$WaterTemp > mean_water_temp_overall], 
+       DJFMP_CHN_df$ForkLength[DJFMP_CHN_df$WaterTemp < mean_water_temp_overall])
+```
+**The test statistic (z-score) tells us that the observed difference in fork length is 74.038 standard deviations above the Null hypothesis of zero difference.**
+
+**The 95% confidence interval tells us that there is a 95% probability that the range [7.148360, 7.537123] is likely to contain the true population parameter, which is the difference in Chinook salmon fork lengths across sites with colder water temperatures versus sites with warmer water temperatures.**
+
+
+## Step 4: Quantify the probability that the sample statistic differs from the null
+
 - Use the `lm()` command to estimate the following simple linear regression:
 $$ \text{fork length}_i = \beta_0 + \beta_1 \text{water temperature}_i + \varepsilon_i $$
+- Run a linear regression of y on x
 ```{r}
-# Run a linear regression of y on x, including a constant term.
-model <- summary(lm(ForkLength ~ WaterTemp, data = DJFMP_CHN_df))
-model
+summary(lm(ForkLength ~ WaterTemp, data = DJFMP_CHN_df))
 ```
 
 **Intercept:** On average, the predicted fork length of a Chinook salmon for a zero degree Celsius change in water temperature is 30.3742 (mm).  
@@ -122,6 +176,8 @@ model
 **Coefficient on water temperature (WaterTemp):** On average, the predicted fork length of a Chinook salmon increases by 1.6276 (mm) for every one degree Celsius increase in water temperature. 
 
 **Multiple R-squared:** Our coefficient of determination ($R^2$) tells us that 7.75% of the variation in Chinook salmon fork length is explained by water temperature at the site. 
+
+- Visualize Regression Line on Scatter Plot 
 ```{r}
 forklength_vs_watertemp <- ggplot(data = DJFMP_CHN_df, 
                                   aes(x = WaterTemp, 
@@ -135,6 +191,17 @@ forklength_vs_watertemp <- ggplot(data = DJFMP_CHN_df,
 
 forklength_vs_watertemp
 ```
+
+## Step 5: Evaluate whether you can reject or fail to reject your null hypothesis 
+
+**Since $p-value = 2.2e-16 < 0.05$ we reject the null that there is no difference in Chinook salmon fork length in sites with colder water temperatures versus sites with warmer water temperatures. We can say there is a statistically significant difference (at the 5% significance level) in the Chinook salmon fork length across sites with colder water temperatures versus sites with warmer water temperatures.**
+
+
+
+
+
+# Extra stuff ------------------------------------------------------------------
+
 
 ```{r}
 library(modelr)
@@ -181,34 +248,6 @@ mean_water_temp_overall <- mean(DJFMP_CHN_df$WaterTemp)
 
 ```
 
-a. State your null and alternative hypotheses 
-**Null Hypothesis**
-$$H_{0}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} = 0$$
-**Alternative hypothesis**
-$$H_{A}: \mu_{ForkLengthCold} - \mu_{ForkLengthWarm} \neq 0$$
-b. Compute a point estimate of your parameter of interest
-**point estimate**
-```{r}
-# The fork lengths for warm water sites vs. cold water sites
-warm_sites <- DJFMP_CHN_df %>%
-  filter(WaterTemp > mean_water_temp_overall) %>%
-  summarise(ForkLength, WaterTemp)
-  
-cold_sites <- DJFMP_CHN_df %>% 
-  filter(WaterTemp < mean_water_temp_overall) %>%
-  summarise(ForkLength, WaterTemp)
-
-```
-
-```{r}
-t.test(warm_sites$ForkLength[warm_sites$WaterTemp], 
-       cold_sites$ForkLength[cold_sites$WaterTemp])
-```
-**The test statistic (z-score) tells us that the observed difference in fork length is 413.67 standard deviations above the Null hypothesis of zero difference.**
-
-**Since $p-value = 2.2e-16 < 0.05$ we reject the null that there is no difference in Chinook salmon fork length in sites with colder mean water temperatures versus sites with warmer mean water temperatures. We can say there is a statistically significant difference (at the 5% significance level) in the Chinook salmon fork length across sites with colder mean water temperatures versus sites with warmer mean water temperatures.**
-
-**There is a 95% probability that the range [30.12407, 30.41090] is likely to contain the true population parameter, which is the Chinook salmon fork length across sites with colder mean water temperatures versus sites with warmer mean water temperatures.**
 
 ```{r}
 # Find the mean of each month per site and then get the time series of that data frame. 
