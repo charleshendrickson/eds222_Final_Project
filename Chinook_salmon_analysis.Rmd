@@ -22,7 +22,7 @@ library(knitr)
 
 - Project Question: "Is the mean fork length of juvenile Chinook salmon different at sites with colder water temperatures than at sites with warmer water temperatures?"
 
-- I will consider differences in the mean Chinook salmon fork length (mm) across sites with different mean water temperatures in the San Francisco Estuary (1976-2021), and conduct a simple hypothesis test.
+- I will consider differences in the mean juvenile Chinook salmon fork length (mm) across sites with warmer or colder than average water temperatures in the San Francisco Estuary (1976-2021), and conduct a simple hypothesis test.
 
 ## Step 1: Define the **null** and **alternative** hypotheses: 
 
@@ -49,7 +49,7 @@ DJFMP_df <- as.data.frame(
 # Filter data set for just Chinook salmon (CHN) observations 
 DJFMP_CHN_df <- DJFMP_df %>% 
   filter(OrganismCode == 'CHN') %>% 
-  select(Location, SampleDate, ForkLength, WaterTemp, MethodCode) %>% 
+  select(Location, SampleDate, ForkLength, WaterTemp, MethodCode, Count) %>% 
   mutate(SampleDate = as.Date(SampleDate))
 
 # Drop NA's from WaterTemp column
@@ -185,7 +185,7 @@ summary(lm(ForkLength ~ WaterTemp, data = DJFMP_CHN_df))
 
 **Coefficient on water temperature (WaterTemp):** On average, the predicted fork length of a juvenile Chinook salmon increases by 1.6276 (mm) for every one degree Celsius increase in water temperature. 
 
-**Multiple R-squared:** Our coefficient of determination ($R^2$) tells us that 7.75% of the variation in juvenile Chinook salmon fork lengths is explained by water temperature at the site. 
+**R-squared:** Our coefficient of determination ($R^2$) tells us that 7.75% of the variation in juvenile Chinook salmon fork lengths is explained by water temperature at the site. 
 
 - Visualize Regression Line on Scatter Plot 
 ```{r}
